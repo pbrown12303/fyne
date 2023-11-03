@@ -117,8 +117,9 @@ func TestFileDialogResize(t *testing.T) {
 	d := &fileDialog{file: file}
 	open := widget.NewButton("open", func() {})
 	ui := container.NewBorder(nil, nil, nil, open)
-	originalSize := ui.MinSize().Add(fyne.NewSize(fileIconCellWidth*2+theme.Padding()*4,
-		(fileIconSize+fileTextSize)+theme.Padding()*4))
+	pad := theme.Padding()
+	itemMin := d.newFileItem(storage.NewFileURI("filename.txt"), false, false).MinSize()
+	originalSize := ui.MinSize().Add(itemMin.AddWidthHeight(itemMin.Width+pad*6, pad*3))
 	d.win = widget.NewModalPopUp(ui, file.parent.Canvas())
 	d.win.Resize(originalSize)
 	file.dialog = d
@@ -502,6 +503,47 @@ func TestView(t *testing.T) {
 	assert.Equal(t, "Yes", confirm.Text)
 	dismiss := ui.Objects[2].(*fyne.Container).Objects[0].(*fyne.Container).Objects[0].(*widget.Button)
 	assert.Equal(t, "Dismiss", dismiss.Text)
+}
+
+func TestViewPreferences(t *testing.T) {
+	win := test.NewWindow(widget.NewLabel("Content"))
+
+	prefs := fyne.CurrentApp().Preferences()
+
+	// set viewLayout to an invalid value to verify that this situation is handled properly
+	prefs.SetInt(viewLayoutKey, -1)
+
+	dlg := NewFileOpen(func(reader fyne.URIReadCloser, err error) {
+		assert.Nil(t, err)
+		assert.Nil(t, reader)
+	}, win)
+
+	dlg.Show()
+
+	popup := win.Canvas().Overlays().Top().(*widget.PopUp)
+	defer win.Canvas().Overlays().Remove(popup)
+	assert.NotNil(t, popup)
+
+	ui := popup.Content.(*fyne.Container)
+	toggleViewButton := ui.Objects[1].(*fyne.Container).Objects[0].(*fyne.Container).Objects[1].(*widget.Button)
+
+	// viewLayout preference should be 'grid'
+	view := viewLayout(prefs.Int(viewLayoutKey))
+	assert.Equal(t, gridView, view)
+
+	// toggle view
+	test.Tap(toggleViewButton)
+
+	// viewLayout preference should be 'list'
+	view = viewLayout(prefs.Int(viewLayoutKey))
+	assert.Equal(t, listView, view)
+
+	// toggle view
+	test.Tap(toggleViewButton)
+
+	// viewLayout preference should be 'grid' again
+	view = viewLayout(prefs.Int(viewLayoutKey))
+	assert.Equal(t, gridView, view)
 }
 
 func TestFileFavorites(t *testing.T) {
