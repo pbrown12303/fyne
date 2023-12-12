@@ -13,7 +13,6 @@ import (
 	"fyne.io/fyne/v2/internal/async"
 	"fyne.io/fyne/v2/internal/cache"
 	"fyne.io/fyne/v2/internal/driver"
-	"fyne.io/fyne/v2/internal/painter/gl"
 )
 
 // SizeableCanvas defines a canvas with size related functions.
@@ -38,7 +37,7 @@ type Canvas struct {
 
 	shortcut fyne.ShortcutHandler
 
-	painter gl.Painter
+	painter Painter
 
 	// Any object that requestes to enter to the refresh queue should
 	// not be omitted as it is always a rendering task's decision
@@ -59,6 +58,7 @@ func (c *Canvas) AddShortcut(shortcut fyne.Shortcut, handler func(shortcut fyne.
 	c.shortcut.AddShortcut(shortcut, handler)
 }
 
+// DrawDebugOverlay draws the debug overlay
 func (c *Canvas) DrawDebugOverlay(obj fyne.CanvasObject, pos fyne.Position, size fyne.Size) {
 	switch obj.(type) {
 	case fyne.Widget:
@@ -332,7 +332,7 @@ func (c *Canvas) Overlays() fyne.OverlayStack {
 }
 
 // Painter returns the canvas painter.
-func (c *Canvas) Painter() gl.Painter {
+func (c *Canvas) Painter() Painter {
 	return c.painter
 }
 
@@ -410,7 +410,7 @@ func (c *Canvas) SetMobileWindowHeadTree(head fyne.CanvasObject) {
 }
 
 // SetPainter sets the canvas painter.
-func (c *Canvas) SetPainter(p gl.Painter) {
+func (c *Canvas) SetPainter(p Painter) {
 	c.painter = p
 }
 

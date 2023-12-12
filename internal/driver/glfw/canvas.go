@@ -29,7 +29,6 @@ type glCanvas struct {
 	onTypedKey  func(*fyne.KeyEvent)
 	onKeyDown   func(*fyne.KeyEvent)
 	onKeyUp     func(*fyne.KeyEvent)
-	// shortcut    fyne.ShortcutHandler
 
 	scale, detectedScale, texScale float32
 
