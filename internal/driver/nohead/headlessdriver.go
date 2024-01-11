@@ -1,8 +1,11 @@
 package nohead
 
 import (
+	"fmt"
+	"os"
 	"runtime"
 	"sync"
+	"sync/atomic"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/internal/driver"
@@ -11,8 +14,6 @@ import (
 	intRepo "fyne.io/fyne/v2/internal/repository"
 	"fyne.io/fyne/v2/storage/repository"
 )
-
-const defaultTitle = "Fyne Application"
 
 // mainGoroutineID stores the main goroutine ID.
 // This ID must be initialized in main.init because
@@ -26,21 +27,27 @@ var curWindow *headlessWindow
 const drawOnMainThread bool = runtime.GOOS == "darwin" && runtime.GOARCH == "arm64"
 
 type headlessDriver struct {
-	windowLock sync.RWMutex
-
-	drawDone chan struct{}
-
-	device       *headlessDevice
-	painter      common.Painter
+	windowLock   sync.RWMutex
 	windows      []fyne.Window
+	device       *headlessDevice
+	done         chan struct{}
+	drawDone     chan struct{}
+	waitForStart chan struct{}
+
+	currentKeyModifiers fyne.KeyModifier // desktop driver only
+
+	trayStart, trayStop func()     // shut down the system tray, if used
+	systrayMenu         *fyne.Menu // cache the menu set so we know when to refresh
+
+	painter      common.Painter
 	windowsMutex sync.RWMutex
 }
 
 // Declare conformity with Driver
 var _ fyne.Driver = (*headlessDriver)(nil)
 
-// NewHeadlessDriver sets up and registers a new dummy driver for test purpose
-func NewHeadlessDriver() *headlessDriver {
+// newHeadlessDriver sets up and registers a new dummy driver for test purpose
+func newHeadlessDriver() *headlessDriver {
 	drv := &headlessDriver{windowsMutex: sync.RWMutex{}}
 	repository.Register("file", intRepo.NewFileRepository())
 
@@ -113,7 +120,6 @@ func (d *headlessDriver) RenderedTextSize(text string, size float32, style fyne.
 }
 
 func (d *headlessDriver) Run() {
-	// no-op
 }
 
 func (d *headlessDriver) StartAnimation(a *fyne.Animation) {
@@ -127,6 +133,23 @@ func (d *headlessDriver) StopAnimation(a *fyne.Animation) {
 
 func (d *headlessDriver) Quit() {
 	// no-op
+}
+
+func (d *headlessDriver) initFailed(msg string, err error) {
+	fmt.Printf(msg+": %v", err)
+
+	onMain := atomic.LoadUint32(&running) == 0
+	if onMain {
+		d.Quit()
+	} else {
+		os.Exit(1)
+	}
+}
+
+func (d *headlessDriver) windowList() []fyne.Window {
+	d.windowLock.RLock()
+	defer d.windowLock.RUnlock()
+	return d.windows
 }
 
 func (d *headlessDriver) removeWindow(w *headlessWindow) {

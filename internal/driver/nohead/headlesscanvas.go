@@ -7,13 +7,11 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/internal"
+	"fyne.io/fyne/v2/internal/app"
+	"fyne.io/fyne/v2/internal/driver"
 	"fyne.io/fyne/v2/internal/driver/common"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-)
-
-var (
-	dummyHeadlessCanvas *HeadlessCanvas
 )
 
 // Declare conformity with Canvas interface
@@ -36,45 +34,32 @@ type HeadlessCanvas struct {
 
 	onTypedRune func(rune)
 	onTypedKey  func(*fyne.KeyEvent)
-}
 
-// GetInMemoryHeadlessCanvas returns a reusable in-memory canvas used for testing
-func GetInMemoryHeadlessCanvas() *HeadlessCanvas {
-	if dummyHeadlessCanvas == nil {
-		dummyHeadlessCanvas = NewHeadlessCanvas()
-	}
-
-	return dummyHeadlessCanvas
+	context driver.WithContext
 }
 
 // NewHeadlessCanvas returns a single use in-memory canvas used for testing.
 // This canvas has no painter so calls to Capture() will return a blank image.
 func NewHeadlessCanvas() *HeadlessCanvas {
 	c := &HeadlessCanvas{
-		scale: 1.0,
-		size:  fyne.NewSize(10, 10),
+		scale:    1.0,
+		texScale: 1.0,
+		size:     fyne.NewSize(10, 10),
 	}
 	c.SetPadded(true)
 	c.Initialize(c, nil)
-	c.setContent(&canvas.Rectangle{FillColor: theme.BackgroundColor()})
+	painter := NewHeadlessPainter(c)
+	c.SetPainter(painter)
+	c.setContent(&canvas.Rectangle{})
 	return c
 }
 
-// NewHeadlessCanvasWithPainter allows creation of an in-memory canvas with a specific painter.
-// The painter will be used to render in the Capture() call.
-func NewHeadlessCanvasWithPainter(painter *HeadlessPainter) *HeadlessCanvas {
-	canvas := NewHeadlessCanvas()
-	canvas.SetPainter(painter)
-
-	return canvas
-}
-
-// NewHeadlessTransparentCanvasWithPainter allows creation of an in-memory canvas with a specific painter without a background color.
+// NewHeadlessTransparentCanvas allows creation of an in-memory canvas with a specific painter without a background color.
 // The painter will be used to render in the Capture() call.
 //
 // Since: 2.2
-func NewHeadlessTransparentCanvasWithPainter(painter *HeadlessPainter) *HeadlessCanvas {
-	canvas := NewHeadlessCanvasWithPainter(painter)
+func NewHeadlessTransparentCanvas() *HeadlessCanvas {
+	canvas := NewHeadlessCanvas()
 	canvas.transparent = true
 
 	return canvas
@@ -82,6 +67,9 @@ func NewHeadlessTransparentCanvasWithPainter(painter *HeadlessPainter) *Headless
 
 // Capture renders the content and returns the image
 func (c *HeadlessCanvas) Capture() image.Image {
+	// The headless application does not have a separate painter thread that would ensure canvas minimum
+	// size, so we do it here.
+	c.EnsureMinSize()
 	var img image.Image
 	img = c.Painter().Capture(c)
 	return img
@@ -263,6 +251,32 @@ func (c *HeadlessCanvas) Size() fyne.Size {
 	return c.size
 }
 
+func (c *HeadlessCanvas) applyThemeOutOfTreeObjects() {
+	c.RLock()
+	menu := c.menu
+	padded := c.padded
+	c.RUnlock()
+	if menu != nil {
+		app.ApplyThemeTo(menu, c) // Ensure our menu gets the theme change message as it's out-of-tree
+	}
+
+	c.SetPadded(padded) // refresh the padding for potential theme differences
+}
+
+func (c *HeadlessCanvas) buildMenu(w *headlessWindow, m *fyne.MainMenu) {
+	c.Lock()
+	defer c.Unlock()
+	c.setMenuOverlay(nil)
+	if m == nil {
+		return
+	}
+	if hasNativeMenu() {
+		setupNativeMenu(w, m)
+	} else {
+		c.setMenuOverlay(buildMenuOverlay(m, w))
+	}
+}
+
 // canvasSize computes the needed canvas size for the given content size
 func (c *HeadlessCanvas) canvasSize(contentSize fyne.Size) fyne.Size {
 	canvasSize := contentSize.Add(fyne.NewSize(0, c.menuHeight()))
@@ -340,9 +354,43 @@ func (c *HeadlessCanvas) paint(size fyne.Size) {
 	c.WalkTrees(paint, afterPaint)
 }
 
+func (c *HeadlessCanvas) reloadScale() {
+	w := c.context.(*headlessWindow)
+	w.viewLock.RLock()
+	windowVisible := w.visible
+	w.viewLock.RUnlock()
+	if !windowVisible {
+		return
+	}
+
+	c.Lock()
+	c.scale = w.calculatedScale()
+	c.Unlock()
+	c.SetDirty()
+
+	c.context.RescaleContext()
+}
+
 func (c *HeadlessCanvas) setContent(content fyne.CanvasObject) {
 	c.content = content
 	c.SetContentTreeAndFocusMgr(content)
+}
+
+func (c *HeadlessCanvas) setMenuOverlay(b fyne.CanvasObject) {
+	c.menu = b
+	c.SetMenuTreeAndFocusMgr(b)
+
+	if c.menu != nil && !c.size.IsZero() {
+		c.content.Resize(c.contentSize(c.size))
+		c.content.Move(c.contentPos())
+
+		c.menu.Refresh()
+		c.menu.Resize(fyne.NewSize(c.size.Width, c.menu.MinSize().Height))
+	}
+}
+
+func hasNativeMenu() bool {
+	return false
 }
 
 func layoutAndCollect(objects []fyne.CanvasObject, o fyne.CanvasObject, size fyne.Size) []fyne.CanvasObject {
@@ -363,4 +411,8 @@ func layoutAndCollect(objects []fyne.CanvasObject, o fyne.CanvasObject, size fyn
 		}
 	}
 	return objects
+}
+
+func setupNativeMenu(_ *headlessWindow, _ *fyne.MainMenu) {
+	// no-op
 }

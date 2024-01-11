@@ -9,8 +9,8 @@ var _ fyne.Clipboard = (*headlessClipboard)(nil)
 
 // headlessClipboard represents the system headlessClipboard
 type headlessClipboard struct {
-	window  *headlessWindow
-	content string
+	headlessWindow *headlessWindow
+	content        string
 }
 
 // Content returns the clipboard content

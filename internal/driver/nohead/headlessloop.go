@@ -4,10 +4,14 @@ import (
 	"runtime"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/internal/app"
 	"fyne.io/fyne/v2/internal/cache"
 	"fyne.io/fyne/v2/internal/driver/common"
+	"fyne.io/fyne/v2/internal/painter"
+	"fyne.io/fyne/v2/internal/scale"
 )
 
 type funcData struct {
@@ -50,18 +54,23 @@ func runOnMain(f func()) {
 	<-done
 }
 
-// // force a function f to run on the draw thread
-// func runOnDraw(w *headlessWindow, f func()) {
-// 	if drawOnMainThread {
-// 		runOnMain(func() { w.RunWithContext(f) })
-// 		return
-// 	}
-// 	done := common.DonePool.Get().(chan struct{})
-// 	defer common.DonePool.Put(done)
+// force a function f to run on the draw thread
+func runOnDraw(w *headlessWindow, f func()) {
+	if drawOnMainThread {
+		runOnMain(func() {
+			if w.isClosing() {
+				return
+			}
+			f()
+		})
+		return
+	}
+	done := common.DonePool.Get().(chan struct{})
+	defer common.DonePool.Put(done)
 
-// 	drawFuncQueue <- drawData{f: f, win: w, done: done}
-// 	<-done
-// }
+	drawFuncQueue <- drawData{f: f, win: w, done: done}
+	<-done
+}
 
 func (d *headlessDriver) drawSingleFrame() {
 	refreshingCanvases := make([]fyne.Canvas, 0)
@@ -87,159 +96,158 @@ func (d *headlessDriver) drawSingleFrame() {
 	cache.CleanCanvases(refreshingCanvases)
 }
 
-// func (d *headlessDriver) runGL() {
-// 	if !atomic.CompareAndSwapUint32(&running, 0, 1) {
-// 		return // Run was called twice.
-// 	}
-// 	close(d.waitForStart) // Signal that execution can continue.
+func (d *headlessDriver) initHeadless() {
+	initOnce.Do(func() {
+		d.startDrawThread()
+	})
+}
 
-// 	d.initGLFW()
-// 	if d.trayStart != nil {
-// 		d.trayStart()
-// 	}
-// 	fyne.CurrentApp().Lifecycle().(*app.Lifecycle).TriggerStarted()
-// 	eventTick := time.NewTicker(time.Second / 60)
-// 	for {
-// 		select {
-// 		case <-d.done:
-// 			eventTick.Stop()
-// 			d.drawDone <- struct{}{} // wait for draw thread to stop
-// 			d.Terminate()
-// 			fyne.CurrentApp().Lifecycle().(*app.Lifecycle).TriggerStopped()
-// 			return
-// 		case f := <-funcQueue:
-// 			f.f()
-// 			f.done <- struct{}{}
-// 		case <-eventTick.C:
-// 			d.tryPollEvents()
-// 			windowsToRemove := 0
-// 			for _, win := range d.windowList() {
-// 				w := win.(*window)
-// 				if w.viewport == nil {
-// 					continue
-// 				}
+func (d *headlessDriver) runHeadless() {
+	if !atomic.CompareAndSwapUint32(&running, 0, 1) {
+		return // Run was called twice.
+	}
+	close(d.waitForStart) // Signal that execution can continue.
 
-// 				if w.viewport.ShouldClose() {
-// 					windowsToRemove++
-// 					continue
-// 				}
+	d.initHeadless()
+	if d.trayStart != nil {
+		d.trayStart()
+	}
+	fyne.CurrentApp().Lifecycle().(*app.Lifecycle).TriggerStarted()
+	eventTick := time.NewTicker(time.Second / 60)
+	for {
+		select {
+		case <-d.done:
+			eventTick.Stop()
+			d.drawDone <- struct{}{} // wait for draw thread to stop
+			fyne.CurrentApp().Lifecycle().(*app.Lifecycle).TriggerStopped()
+			return
+		case f := <-funcQueue:
+			f.f()
+			f.done <- struct{}{}
+		case <-eventTick.C:
+			windowsToRemove := 0
+			for _, win := range d.windowList() {
+				w := win.(*headlessWindow)
+				if w.viewport == nil {
+					continue
+				}
 
-// 				w.viewLock.RLock()
-// 				expand := w.shouldExpand
-// 				fullScreen := w.fullScreen
-// 				w.viewLock.RUnlock()
+				w.viewLock.RLock()
+				expand := w.shouldExpand
+				fullScreen := w.fullScreen
+				w.viewLock.RUnlock()
 
-// 				if expand && !fullScreen {
-// 					w.fitContent()
-// 					w.viewLock.Lock()
-// 					shouldExpand := w.shouldExpand
-// 					w.shouldExpand = false
-// 					view := w.viewport
-// 					w.viewLock.Unlock()
-// 					if shouldExpand {
-// 						view.SetSize(w.shouldWidth, w.shouldHeight)
-// 					}
-// 				}
+				if expand && !fullScreen {
+					w.fitContent()
+					w.viewLock.Lock()
+					w.shouldExpand = false
+					w.viewLock.Unlock()
+				}
 
-// 				if drawOnMainThread {
-// 					d.drawSingleFrame()
-// 				}
-// 			}
-// 			if windowsToRemove > 0 {
-// 				oldWindows := d.windowList()
-// 				newWindows := make([]fyne.Window, 0, len(oldWindows)-windowsToRemove)
+				if drawOnMainThread {
+					d.drawSingleFrame()
+				}
+			}
+			if windowsToRemove > 0 {
+				oldWindows := d.windowList()
+				newWindows := make([]fyne.Window, 0, len(oldWindows)-windowsToRemove)
 
-// 				for _, win := range oldWindows {
-// 					w := win.(*window)
-// 					if w.viewport == nil {
-// 						continue
-// 					}
+				for _, win := range oldWindows {
+					w := win.(*headlessWindow)
+					if w.viewport == nil {
+						continue
+					}
 
-// 					if w.viewport.ShouldClose() {
-// 						w.viewLock.Lock()
-// 						w.visible = false
-// 						v := w.viewport
-// 						w.viewLock.Unlock()
+					newWindows = append(newWindows, win)
+				}
 
-// 						// remove window from window list
-// 						v.Destroy()
-// 						w.destroy(d)
-// 						continue
-// 					}
+				d.windowLock.Lock()
+				d.windows = newWindows
+				d.windowLock.Unlock()
 
-// 					newWindows = append(newWindows, win)
-// 				}
-
-// 				d.windowLock.Lock()
-// 				d.windows = newWindows
-// 				d.windowLock.Unlock()
-
-// 				if len(newWindows) == 0 {
-// 					d.Quit()
-// 				}
-// 			}
-// 		}
-// 	}
-// }
+				if len(newWindows) == 0 {
+					d.Quit()
+				}
+			}
+		}
+	}
+}
 
 func (d *headlessDriver) repaintWindow(w *headlessWindow) {
 	canvas := w.canvas
-	if canvas.EnsureMinSize() {
-		w.viewLock.Lock()
-		w.shouldExpand = true
-		w.viewLock.Unlock()
-	}
-	canvas.FreeDirtyTextures()
+	w.RunWithContext(func() {
+		if canvas.EnsureMinSize() {
+			w.viewLock.Lock()
+			w.shouldExpand = true
+			w.viewLock.Unlock()
+		}
+		canvas.FreeDirtyTextures()
 
-	canvas.paint(canvas.Size())
+		updateHeadlessContext(w)
+		canvas.paint(canvas.Size())
 
+		w.viewLock.RLock()
+		view := w.viewport
+		visible := w.visible
+		w.viewLock.RUnlock()
+
+		if view != nil && visible {
+			view.SwapBuffers()
+		}
+	})
 }
 
-// func (d *headlessDriver) startDrawThread() {
-// 	settingsChange := make(chan fyne.Settings)
-// 	fyne.CurrentApp().Settings().AddChangeListener(settingsChange)
-// 	var drawCh <-chan time.Time
-// 	if drawOnMainThread {
-// 		drawCh = make(chan time.Time) // don't tick when on M1
-// 	} else {
-// 		drawCh = time.NewTicker(time.Second / 60).C
-// 	}
+func (d *headlessDriver) startDrawThread() {
+	settingsChange := make(chan fyne.Settings)
+	fyne.CurrentApp().Settings().AddChangeListener(settingsChange)
+	var drawCh <-chan time.Time
+	if drawOnMainThread {
+		drawCh = make(chan time.Time) // don't tick when on M1
+	} else {
+		drawCh = time.NewTicker(time.Second / 60).C
+	}
 
-// 	go func() {
-// 		runtime.LockOSThread()
+	go func() {
+		runtime.LockOSThread()
 
-// 		for {
-// 			select {
-// 			case <-d.drawDone:
-// 				return
-// 			case f := <-drawFuncQueue:
-// 				f.win.RunWithContext(f.f)
-// 				f.done <- struct{}{}
-// 			case set := <-settingsChange:
-// 				painter.ClearFontCache()
-// 				cache.ResetThemeCaches()
-// 				app.ApplySettingsWithCallback(set, fyne.CurrentApp(), func(w fyne.Window) {
-// 					c, ok := w.Canvas().(*HeadlessCanvas)
-// 					if !ok {
-// 						return
-// 					}
-// 					c.applyThemeOutOfTreeObjects()
-// 					go c.reloadScale()
-// 				})
-// 			case <-drawCh:
-// 				d.drawSingleFrame()
-// 			}
-// 		}
-// 	}()
-// }
-
-func (d *headlessDriver) windowList() []fyne.Window {
-	d.windowLock.RLock()
-	defer d.windowLock.RUnlock()
-	return d.windows
+		for {
+			select {
+			case <-d.drawDone:
+				return
+			case f := <-drawFuncQueue:
+				f.win.RunWithContext(f.f)
+				f.done <- struct{}{}
+			case set := <-settingsChange:
+				painter.ClearFontCache()
+				cache.ResetThemeCaches()
+				app.ApplySettingsWithCallback(set, fyne.CurrentApp(), func(w fyne.Window) {
+					c, ok := w.Canvas().(*HeadlessCanvas)
+					if !ok {
+						return
+					}
+					c.applyThemeOutOfTreeObjects()
+					go c.reloadScale()
+				})
+			case <-drawCh:
+				d.drawSingleFrame()
+			}
+		}
+	}()
 }
 
 // refreshWindow requests that the specified window be redrawn
 func refreshWindow(w *headlessWindow) {
 	w.canvas.SetDirty()
+}
+
+func updateHeadlessContext(w *headlessWindow) {
+	canvas := w.canvas
+	size := canvas.Size()
+
+	// w.width and w.height are not correct if we are maximised, so figure from canvas
+	winWidth := float32(scale.ToScreenCoordinate(canvas, size.Width)) * canvas.texScale
+	winHeight := float32(scale.ToScreenCoordinate(canvas, size.Height)) * canvas.texScale
+
+	canvas.Painter().SetFrameBufferScale(canvas.texScale)
+	w.canvas.Painter().SetOutputSize(int(winWidth), int(winHeight))
 }

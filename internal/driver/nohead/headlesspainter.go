@@ -21,8 +21,8 @@ type HeadlessPainter struct {
 var _ common.Painter = (*HeadlessPainter)(nil)
 
 // NewHeadlessPainter creates a new HeadlessPainter.
-func NewHeadlessPainter() *HeadlessPainter {
-	return &HeadlessPainter{}
+func NewHeadlessPainter(canvas *HeadlessCanvas) *HeadlessPainter {
+	return &HeadlessPainter{canvas: canvas}
 }
 
 // Init tell a new painter to initialise, usually called after a context is available
@@ -62,7 +62,7 @@ func (hp *HeadlessPainter) Paint(canvasObject fyne.CanvasObject, position fyne.P
 	bounds := image.Rect(0, 0, scale.ToScreenCoordinate(can, can.Size().Width), scale.ToScreenCoordinate(can, can.Size().Height))
 	base := image.NewNRGBA(bounds)
 
-	if can.transparent {
+	if !can.transparent {
 		draw.Draw(base, bounds, image.NewUniform(theme.BackgroundColor()), image.Point{}, draw.Src)
 	}
 

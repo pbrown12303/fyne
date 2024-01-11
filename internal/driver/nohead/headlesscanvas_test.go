@@ -7,6 +7,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/test"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 
@@ -14,6 +15,7 @@ import (
 )
 
 func TestHeadlessCanvas_ChildMinSizeChangeAffectsAncestorsUpToRoot(t *testing.T) {
+	test.NewApp()
 	w := createWindow("Test").(*headlessWindow)
 	c := w.Canvas().(*HeadlessCanvas)
 	leftObj1 := canvas.NewRectangle(color.Black)
@@ -42,6 +44,7 @@ func TestHeadlessCanvas_ChildMinSizeChangeAffectsAncestorsUpToRoot(t *testing.T)
 }
 
 func TestHeadlessCanvas_ChildMinSizeChangeAffectsAncestorsUpToScroll(t *testing.T) {
+	test.NewApp()
 	w := createWindow("Test").(*headlessWindow)
 	c := w.Canvas().(*HeadlessCanvas)
 	leftObj1 := canvas.NewRectangle(color.Black)
@@ -77,6 +80,7 @@ func TestHeadlessCanvas_ChildMinSizeChangeAffectsAncestorsUpToScroll(t *testing.
 }
 
 func TestHeadlessCanvas_ChildMinSizeChangesInDifferentScrollAffectAncestorsUpToScroll(t *testing.T) {
+	test.NewApp()
 	w := createWindow("Test").(*headlessWindow)
 	c := w.Canvas().(*HeadlessCanvas)
 	leftObj1 := canvas.NewRectangle(color.Black)
@@ -121,6 +125,7 @@ func TestHeadlessCanvas_ChildMinSizeChangesInDifferentScrollAffectAncestorsUpToS
 }
 
 func TestHeadlessCanvas_Content(t *testing.T) {
+	test.NewApp()
 	content := &canvas.Circle{}
 	w := createWindow("Test")
 	w.SetContent(content)
@@ -129,6 +134,7 @@ func TestHeadlessCanvas_Content(t *testing.T) {
 }
 
 func TestHeadlessCanvas_ContentChangeWithoutMinSizeChangeDoesNotLayout(t *testing.T) {
+	test.NewApp()
 	w := createWindow("Test").(*headlessWindow)
 	c := w.Canvas().(*HeadlessCanvas)
 	leftObj1 := canvas.NewRectangle(color.Black)
@@ -294,6 +300,7 @@ func TestHeadlessCanvas_ContentChangeWithoutMinSizeChangeDoesNotLayout(t *testin
 // }
 
 func TestHeadlessCanvas_InsufficientSizeDoesntTriggerResizeIfSizeIsAlreadyMaxedOut(t *testing.T) {
+	test.NewApp()
 	w := createWindow("Test").(*headlessWindow)
 	c := w.Canvas().(*HeadlessCanvas)
 	canvasSize := fyne.NewSize(200, 100)
@@ -318,6 +325,7 @@ func TestHeadlessCanvas_InsufficientSizeDoesntTriggerResizeIfSizeIsAlreadyMaxedO
 }
 
 func TestHeadlessCanvas_MinSizeShrinkTriggersLayout(t *testing.T) {
+	test.NewApp()
 	w := createWindow("Test").(*headlessWindow)
 	c := w.Canvas().(*HeadlessCanvas)
 	leftObj1 := canvas.NewRectangle(color.Black)
@@ -355,12 +363,14 @@ func TestHeadlessCanvas_MinSizeShrinkTriggersLayout(t *testing.T) {
 }
 
 func TestHeadlessCanvas_NilContent(t *testing.T) {
+	test.NewApp()
 	w := createWindow("Test")
 
 	assert.NotNil(t, w.Content()) // never a nil canvas so we have a sensible fallback
 }
 
 func TestHeadlessCanvas_PixelCoordinateAtPosition(t *testing.T) {
+	test.NewApp()
 	w := createWindow("Test").(*headlessWindow)
 	c := w.Canvas().(*HeadlessCanvas)
 
@@ -381,6 +391,7 @@ func TestHeadlessCanvas_PixelCoordinateAtPosition(t *testing.T) {
 }
 
 func TestHeadlessCanvas_Resize(t *testing.T) {
+	test.NewApp()
 	w := createWindow("Test")
 	w.SetPadded(false)
 
@@ -398,6 +409,7 @@ func TestHeadlessCanvas_Resize(t *testing.T) {
 
 // TODO: this can be removed when #707 is addressed
 func TestHeadlessCanvas_ResizeWithOtherOverlay(t *testing.T) {
+	test.NewApp()
 	w := createWindow("Test")
 	w.SetPadded(false)
 
@@ -420,6 +432,7 @@ func TestHeadlessCanvas_ResizeWithOtherOverlay(t *testing.T) {
 }
 
 func TestHeadlessCanvas_ResizeWithOverlays(t *testing.T) {
+	test.NewApp()
 	w := createWindow("Test")
 	w.SetPadded(false)
 
@@ -449,6 +462,7 @@ func TestHeadlessCanvas_ResizeWithOverlays(t *testing.T) {
 
 // TODO: this can be removed when #707 is addressed
 func TestHeadlessCanvas_ResizeWithPopUpOverlay(t *testing.T) {
+	test.NewApp()
 	w := createWindow("Test")
 	w.SetPadded(false)
 
@@ -473,6 +487,7 @@ func TestHeadlessCanvas_ResizeWithPopUpOverlay(t *testing.T) {
 }
 
 func TestHeadlessCanvas_ResizeWithModalPopUpOverlay(t *testing.T) {
+	test.NewApp()
 	w := createWindow("Test")
 	w.SetPadded(false)
 
@@ -497,6 +512,7 @@ func TestHeadlessCanvas_ResizeWithModalPopUpOverlay(t *testing.T) {
 }
 
 func TestHeadlessCanvas_Scale(t *testing.T) {
+	test.NewApp()
 	w := createWindow("Test").(*headlessWindow)
 	c := w.Canvas().(*HeadlessCanvas)
 
@@ -507,6 +523,7 @@ func TestHeadlessCanvas_Scale(t *testing.T) {
 }
 
 func TestHeadlessCanvas_SetContent(t *testing.T) {
+	test.NewApp()
 	fyne.CurrentApp().Settings().SetTheme(theme.DarkTheme())
 	var menuHeight float32
 	// if hasNativeMenu() {
@@ -533,7 +550,7 @@ func TestHeadlessCanvas_SetContent(t *testing.T) {
 			if tt.menu {
 				w.SetMainMenu(fyne.NewMainMenu(fyne.NewMenu("Test", fyne.NewMenuItem("Test", func() {}))))
 			}
-			ensureCanvasSize(t, w, fyne.NewSize(69, 37))
+			ensureCanvasSize(t, w, fyne.NewSize(10, 10))
 			content := canvas.NewCircle(color.Black)
 			canvasSize := float32(200)
 			w.SetContent(content)

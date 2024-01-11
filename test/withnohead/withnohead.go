@@ -8,6 +8,10 @@ import (
 	"fyne.io/fyne/v2/test"
 )
 
+var (
+	dummyHeadlessCanvas *nohead.HeadlessCanvas
+)
+
 // AssertHeadlessObjectRendersToImage asserts that the given `CanvasObject` renders the same image as the one stored in the master file.
 // The theme used is the standard test theme which may look different to how it shows on your device.
 // The master filename is relative to the `testdata` directory which is relative to the test.
@@ -16,12 +20,32 @@ import (
 // This path is also reported, thus the file can be used as new master.
 //
 // Since 2.3
-func AssertHeadlessObjectRendersToImage(t *testing.T, masterFilename string, o fyne.CanvasObject, msgAndArgs ...interface{}) bool {
-	c := nohead.NewHeadlessCanvasWithPainter(nohead.NewHeadlessPainter())
-	c.SetPadded(false)
+func AssertHeadlessObjectRendersToImage(t *testing.T, masterFilename string, o fyne.CanvasObject, c fyne.Canvas, msgAndArgs ...interface{}) bool {
 	c.SetContent(o)
+	switch typedCanvas := c.(type) {
+	case *nohead.HeadlessCanvas:
+		typedCanvas.EnsureMinSize()
+	}
 
 	return test.AssertRendersToImage(t, masterFilename, c, msgAndArgs...)
+}
+
+// AssertRendersToImage calls c.EnsureMinSize then calls the standart test.AssertRendersToImage
+func AssertRendersToImage(t *testing.T, masterFilename string, c fyne.Canvas, msgAndArgs ...interface{}) bool {
+	switch typedCanvas := c.(type) {
+	case *nohead.HeadlessCanvas:
+		typedCanvas.EnsureMinSize()
+	}
+	return test.AssertRendersToImage(t, masterFilename, c, msgAndArgs...)
+}
+
+// AssertRendersToMarkup calls c.EnsureMinSize then calls the standard test.AssertRendersToMarkup
+func AssertRendersToMarkup(t *testing.T, masterFilename string, c fyne.Canvas, msgAndArgs ...interface{}) bool {
+	switch typedCanvas := c.(type) {
+	case *nohead.HeadlessCanvas:
+		typedCanvas.EnsureMinSize()
+	}
+	return test.AssertRendersToMarkup(t, masterFilename, c, msgAndArgs...)
 }
 
 // AssertHeadlessObjectRendersToMarkup asserts that the given `CanvasObject` renders the same markup as the one stored in the master file.
@@ -36,10 +60,31 @@ func AssertHeadlessObjectRendersToImage(t *testing.T, masterFilename string, o f
 // The only exception to this are text elements which do not contain line breaks unless the text includes them.
 //
 // Since 2.3
-func AssertHeadlessObjectRendersToMarkup(t *testing.T, masterFilename string, o fyne.CanvasObject, msgAndArgs ...interface{}) bool {
-	c := nohead.GetInMemoryHeadlessCanvas()
+func AssertHeadlessObjectRendersToMarkup(t *testing.T, masterFilename string, o fyne.CanvasObject, c fyne.Canvas, msgAndArgs ...interface{}) bool {
 	c.SetContent(o)
-	c.EnsureMinSize()
+	switch typedCanvas := c.(type) {
+	case *nohead.HeadlessCanvas:
+		typedCanvas.EnsureMinSize()
+	}
 
 	return test.AssertRendersToMarkup(t, masterFilename, c, msgAndArgs...)
+}
+
+// GetInMemoryHeadlessCanvas returns a reusable in-memory canvas used for testing
+func GetInMemoryHeadlessCanvas() *nohead.HeadlessCanvas {
+	if dummyHeadlessCanvas == nil {
+		dummyHeadlessCanvas = nohead.NewHeadlessCanvas()
+	}
+
+	return dummyHeadlessCanvas
+}
+
+// NewHeadlessApp returns an initialized headless app
+func NewHeadlessApp() *nohead.HeadlessApp {
+	return nohead.NewHeadlessApp()
+}
+
+// NewHeadlessCanvas returns an initialized headless canvas
+func NewHeadlessCanvas() *nohead.HeadlessCanvas {
+	return nohead.NewHeadlessCanvas()
 }

@@ -7,6 +7,8 @@ import (
 	"sync"
 	"syscall"
 
+	"fyne.io/systray"
+
 	"fyne.io/fyne/v2"
 )
 
@@ -22,6 +24,136 @@ func goroutineID() (id uint64) {
 		id = id*10 + uint64(buf[i]&15)
 	}
 	return id
+}
+
+func (d *headlessDriver) SetSystemTrayMenu(m *fyne.Menu) {
+	// setup.Do(func() {
+	// 	d.trayStart, d.trayStop = systray.RunWithExternalLoop(func() {
+	// 		if systrayIcon != nil {
+	// 			d.SetSystemTrayIcon(systrayIcon)
+	// 		} else if fyne.CurrentApp().Icon() != nil {
+	// 			d.SetSystemTrayIcon(fyne.CurrentApp().Icon())
+	// 		} else {
+	// 			d.SetSystemTrayIcon(theme.BrokenImageIcon())
+	// 		}
+
+	// 		// it must be refreshed after init, so an earlier call would have been ineffective
+	// 		d.refreshSystray(m)
+	// 	}, func() {
+	// 		// anything required for tear-down
+	// 	})
+
+	// 	// the only way we know the app was asked to quit is if this window is asked to close...
+	// 	w := d.CreateWindow("SystrayMonitor")
+	// 	w.(*headlessWindow).create()
+	// 	w.SetCloseIntercept(d.Quit)
+	// 	w.SetOnClosed(systray.Quit)
+	// })
+
+	// d.refreshSystray(m)
+}
+
+// func itemForMenuItem(i *fyne.MenuItem, parent *systray.MenuItem) *systray.MenuItem {
+// 	if i.IsSeparator {
+// 		if parent != nil {
+// 			parent.AddSeparator()
+// 		} else {
+// 			systray.AddSeparator()
+// 		}
+// 		return nil
+// 	}
+
+// 	var item *systray.MenuItem
+// 	if i.Checked {
+// 		if parent != nil {
+// 			item = parent.AddSubMenuItemCheckbox(i.Label, i.Label, true)
+// 		} else {
+// 			item = systray.AddMenuItemCheckbox(i.Label, i.Label, true)
+// 		}
+// 	} else {
+// 		if parent != nil {
+// 			item = parent.AddSubMenuItem(i.Label, i.Label)
+// 		} else {
+// 			item = systray.AddMenuItem(i.Label, i.Label)
+// 		}
+// 	}
+// 	if i.Disabled {
+// 		item.Disable()
+// 	}
+// 	if i.Icon != nil {
+// 		data := i.Icon.Content()
+// 		if svg.IsResourceSVG(i.Icon) {
+// 			b := &bytes.Buffer{}
+// 			res := i.Icon
+// 			// if runtime.GOOS == "windows" && isDark() { // windows menus don't match dark mode so invert icons
+// 			// 	res = theme.NewInvertedThemedResource(i.Icon)
+// 			// }
+// 			img := painter.PaintImage(canvas.NewImageFromResource(res), nil, 64, 64)
+// 			err := png.Encode(b, img)
+// 			if err != nil {
+// 				fyne.LogError("Failed to encode SVG icon for menu", err)
+// 			} else {
+// 				data = b.Bytes()
+// 			}
+// 		}
+
+// 		img, err := toOSIcon(data)
+// 		if err != nil {
+// 			fyne.LogError("Failed to convert systray icon", err)
+// 		} else {
+// 			item.SetIcon(img)
+// 		}
+// 	}
+// 	return item
+// }
+
+func (d *headlessDriver) refreshSystray(m *fyne.Menu) {
+	// d.systrayMenu = m
+	// systray.ResetMenu()
+	// d.refreshSystrayMenu(m, nil)
+
+	// addMissingQuitForMenu(m, d)
+}
+
+func (d *headlessDriver) refreshSystrayMenu(m *fyne.Menu, parent *systray.MenuItem) {
+	// for _, i := range m.Items {
+	// 	item := itemForMenuItem(i, parent)
+	// 	if item == nil {
+	// 		continue // separator
+	// 	}
+	// 	if i.ChildMenu != nil {
+	// 		d.refreshSystrayMenu(i.ChildMenu, item)
+	// 	}
+
+	// 	fn := i.Action
+	// 	go func() {
+	// 		for range item.ClickedCh {
+	// 			if fn != nil {
+	// 				fn()
+	// 			}
+	// 		}
+	// 	}()
+	// }
+}
+
+func (d *headlessDriver) SetSystemTrayIcon(resource fyne.Resource) {
+	// systrayIcon = resource // in case we need it later
+
+	// img, err := toOSIcon(resource.Content())
+	// if err != nil {
+	// 	fyne.LogError("Failed to convert systray icon", err)
+	// 	return
+	// }
+
+	// systray.SetIcon(img)
+}
+
+func (d *headlessDriver) SystemTrayMenu() *fyne.Menu {
+	return d.systrayMenu
+}
+
+func (d *headlessDriver) CurrentKeyModifiers() fyne.KeyModifier {
+	return d.currentKeyModifiers
 }
 
 func (d *headlessDriver) catchTerm() {

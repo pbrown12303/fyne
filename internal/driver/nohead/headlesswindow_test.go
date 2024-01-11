@@ -6,14 +6,16 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
+	"fyne.io/fyne/v2/test"
 	"fyne.io/fyne/v2/theme"
 
 	"github.com/stretchr/testify/assert"
 )
 
-var d = NewHeadlessDriver()
+var d = newHeadlessDriver()
 
 func TestHeadlessDriver_CreateWindow(t *testing.T) {
+	test.NewApp()
 	w := createWindow("Test").(*headlessWindow)
 
 	assert.True(t, w.Padded())
@@ -40,6 +42,7 @@ func TestHeadlessDriver_CreateWindow(t *testing.T) {
 // }
 
 func TestWindow_MinSize_Fixed(t *testing.T) {
+	test.NewApp()
 	w := createWindow("Test").(*headlessWindow)
 	r := canvas.NewRectangle(color.White)
 	minSize := fyne.NewSize(100, 100)
